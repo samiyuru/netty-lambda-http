@@ -16,28 +16,27 @@
  */
 package spark.webserver;
 
+import io.netty.channel.socket.SocketChannel;
+import net.javaforge.netty.servlet.bridge.ServletBridgeChannelPipelineFactory;
+import net.javaforge.netty.servlet.bridge.config.WebappConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.wso2.carbon.kernel.transports.TransportManager;
+import org.wso2.carbon.transport.http.netty.internal.NettyTransportDataHolder;
+import org.wso2.carbon.transport.http.netty.internal.config.ListenerConfiguration;
+import org.wso2.carbon.transport.http.netty.listener.CarbonNettyServerInitializer;
+import org.wso2.carbon.transport.http.netty.listener.NettyListener;
+import spark.SparkServer;
+import spark.ssl.SslStores;
+
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
-
-import org.eclipse.jetty.server.Connector;
-import org.eclipse.jetty.server.Handler;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.HandlerList;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import spark.SparkServer;
-import spark.webserver.jetty.JettyServerFactory;
-import spark.webserver.jetty.SocketConnectorFactory;
-import spark.ssl.SslStores;
-import spark.webserver.websocket.WebSocketServletContextHandlerFactory;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 /**
  * Spark server implementation
@@ -48,13 +47,13 @@ public class JettySparkServer implements SparkServer {
 
     private static final int SPARK_DEFAULT_PORT = 4567;
     private static final String NAME = "Spark";
+    private TransportManager transportManager = new TransportManager();
 
-    private Handler handler;
-    private Server server;
+    private JettyHandler handler;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    public JettySparkServer(Handler handler) {
+    public JettySparkServer(JettyHandler handler) {
         this.handler = handler;
         System.setProperty("org.mortbay.log.class", "spark.JettyLogger");
     }
@@ -73,59 +72,95 @@ public class JettySparkServer implements SparkServer {
                        Map<String, Class<?>> webSocketHandlers,
                        Optional<Integer> webSocketIdleTimeoutMillis) {
 
-        if (port == 0) {
-            try (ServerSocket s = new ServerSocket(0)) {
-                port = s.getLocalPort();
-            } catch (IOException e) {
-                logger.error("Could not get first available port (port set to 0), using default: {}", SPARK_DEFAULT_PORT);
-                port = SPARK_DEFAULT_PORT;
-            }
-        }
+//        if (port == 0) {
+//            try (ServerSocket s = new ServerSocket(0)) {
+//                port = s.getLocalPort();
+//            } catch (IOException e) {
+//                logger.error("Could not get first available port (port set to 0), using default: {}", SPARK_DEFAULT_PORT);
+//                port = SPARK_DEFAULT_PORT;
+//            }
+//        }
+//
+//        server = JettyServerFactory.createServer(maxThreads, minThreads, threadIdleTimeoutMillis);
+//
+//        ServerConnector connector;
+//
+//        if (sslStores == null) {
+//            connector = SocketConnectorFactory.createSocketConnector(server, host, port);
+//        } else {
+//            connector = SocketConnectorFactory.createSecureSocketConnector(server, host, port, sslStores);
+//        }
+//
+//        server = connector.getServer();
+//        server.setConnectors(new Connector[] {connector});
+//
+//        ServletContextHandler webSocketServletContextHandler =
+//                WebSocketServletContextHandlerFactory.create(webSocketHandlers, webSocketIdleTimeoutMillis);
+//
+//        // Handle web socket routes
+//        if (webSocketServletContextHandler == null) {
+//            server.setHandler(handler);
+//        } else {
+//            List<Handler> handlersInList = new ArrayList<>();
+//            handlersInList.add(handler);
+//
+//            // WebSocket handler must be the last one
+//            if (webSocketServletContextHandler != null) {
+//                handlersInList.add(webSocketServletContextHandler);
+//            }
+//
+//            HandlerList handlers = new HandlerList();
+//            handlers.setHandlers(handlersInList.toArray(new Handler[handlersInList.size()]));
+//            server.setHandler(handlers);
+//        }
+//
+//        try {
+//            logger.info("== {} has ignited ...", NAME);
+//            logger.info(">> Listening on {}:{}", host, port);
+//
+//            server.start();
+//            latch.countDown();
+//            server.join();
+//        } catch (Exception e) {
+//            logger.error("ignite failed", e);
+//            System.exit(100); // NOSONAR
+//        }
 
-        server = JettyServerFactory.createServer(maxThreads, minThreads, threadIdleTimeoutMillis);
 
-        ServerConnector connector;
+        NettyTransportDataHolder nettyTransportDataHolder = NettyTransportDataHolder.getInstance();
+        ListenerConfiguration listenerConfiguration =
+                new ListenerConfiguration("netty-" + port, "0.0.0.0", port);
+        NettyListener listener = new NettyListener(listenerConfiguration);
+        transportManager.registerTransport(listener);
+        nettyTransportDataHolder.
+                addNettyChannelInitializer(listenerConfiguration.getId(),
+                        new CarbonNettyServerInitializer() {
+                            ServletBridgeChannelPipelineFactory servletBridgeChannelPipelineFactory;
 
-        if (sslStores == null) {
-            connector = SocketConnectorFactory.createSocketConnector(server, host, port);
-        } else {
-            connector = SocketConnectorFactory.createSecureSocketConnector(server, host, port, sslStores);
-        }
+                            @Override
+                            public void setup(Map<String, String> map) {
+                                servletBridgeChannelPipelineFactory =
+                                        new ServletBridgeChannelPipelineFactory(new WebappConfiguration()
+                                                .addHttpServlet(new HttpServlet() {
+                                                    @Override
+                                                    protected void doGet(HttpServletRequest req,
+                                                                         HttpServletResponse resp)
+                                                            throws ServletException, IOException {
+                                                        handler.doHandle(null, req, resp);
+                                                    }
+                                                }));
+                            }
 
-        server = connector.getServer();
-        server.setConnectors(new Connector[] {connector});
-
-        ServletContextHandler webSocketServletContextHandler =
-                WebSocketServletContextHandlerFactory.create(webSocketHandlers, webSocketIdleTimeoutMillis);
-
-        // Handle web socket routes
-        if (webSocketServletContextHandler == null) {
-            server.setHandler(handler);
-        } else {
-            List<Handler> handlersInList = new ArrayList<>();
-            handlersInList.add(handler);
-
-            // WebSocket handler must be the last one
-            if (webSocketServletContextHandler != null) {
-                handlersInList.add(webSocketServletContextHandler);
-            }
-
-            HandlerList handlers = new HandlerList();
-            handlers.setHandlers(handlersInList.toArray(new Handler[handlersInList.size()]));
-            server.setHandler(handlers);
-        }
-
-        try {
-            logger.info("== {} has ignited ...", NAME);
-            logger.info(">> Listening on {}:{}", host, port);
-
-            server.start();
-            latch.countDown();
-            server.join();
-        } catch (Exception e) {
-            logger.error("ignite failed", e);
-            System.exit(100); // NOSONAR
-        }
+                            @Override
+                            public void initChannel(SocketChannel socketChannel) {
+                                try {
+                                    servletBridgeChannelPipelineFactory.initChannel(socketChannel);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
+        transportManager.startTransports();
     }
 
     /**
@@ -134,14 +169,7 @@ public class JettySparkServer implements SparkServer {
     @Override
     public void stop() {
         logger.info(">>> {} shutting down ...", NAME);
-        try {
-            if (server != null) {
-                server.stop();
-            }
-        } catch (Exception e) {
-            logger.error("stop failed", e);
-            System.exit(100); // NOSONAR
-        }
+        transportManager.stopTransports();
         logger.info("done");
     }
 
