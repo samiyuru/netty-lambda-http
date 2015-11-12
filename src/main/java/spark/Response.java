@@ -213,7 +213,7 @@ public class Response {
         cookie.setPath(path);
         cookie.setMaxAge(maxAge);
         cookie.setSecure(secured);
-        cookie.setHttpOnly(httpOnly);
+//        cookie.setHttpOnly(httpOnly);
         response.addCookie(cookie);
     }
 

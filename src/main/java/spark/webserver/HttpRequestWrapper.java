@@ -16,15 +16,13 @@
  */
 package spark.webserver;
 
+import spark.utils.IOUtils;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-
-import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
-
-import spark.utils.IOUtils;
 
 /**
  * Http request wrapper. Wraps the request so 'getInputStream()' can be called multiple times.
@@ -70,18 +68,18 @@ public class HttpRequestWrapper extends HttpServletRequestWrapper {
             return byteArrayInputStream.read();
         }
 
-        @Override
-        public boolean isFinished() {
-            return byteArrayInputStream.available() <= 0;
-        }
-
-        @Override
-        public boolean isReady() {
-            return byteArrayInputStream.available() >= 0;
-        }
-
-        @Override
-        public void setReadListener(ReadListener readListener) {
-        }
+//        @Override
+//        public boolean isFinished() {
+//            return byteArrayInputStream.available() <= 0;
+//        }
+//
+//        @Override
+//        public boolean isReady() {
+//            return byteArrayInputStream.available() >= 0;
+//        }
+//
+//        @Override
+//        public void setReadListener(ReadListener readListener) {
+//        }
     }
 }

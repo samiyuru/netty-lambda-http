@@ -28,7 +28,6 @@ import spark.globalstate.ServletFlag;
 import spark.route.RouteMatcherFactory;
 import spark.route.SimpleRouteMatcher;
 import spark.ssl.SslStores;
-import spark.staticfiles.StaticFiles;
 import spark.webserver.SparkServerFactory;
 
 import static java.util.Objects.requireNonNull;
@@ -218,7 +217,7 @@ final class SparkInstance extends Routable {
         }
         staticFileFolder = folder;
         if (!servletStaticLocationSet) {
-            StaticFiles.configureStaticResources(staticFileFolder);
+//            StaticFiles.configureStaticResources(staticFileFolder);
             servletStaticLocationSet = true;
         } else {
             LOG.warn("Static file location has already been set");
@@ -237,7 +236,7 @@ final class SparkInstance extends Routable {
         }
         externalStaticFileFolder = externalFolder;
         if (!servletExternalStaticLocationSet) {
-            StaticFiles.configureExternalStaticResources(externalStaticFileFolder);
+//            StaticFiles.configureExternalStaticResources(externalStaticFileFolder);
             servletExternalStaticLocationSet = true;
         } else {
             LOG.warn("External static file location has already been set");
@@ -313,7 +312,7 @@ final class SparkInstance extends Routable {
             server.stop();
             latch = new CountDownLatch(1);
         }
-        StaticFiles.clear();
+//        StaticFiles.clear();
         initialized = false;
     }
 

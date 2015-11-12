@@ -61,11 +61,11 @@ public class GzipUtils {
 
         // GZIP Support handled here. First we must ensure that we want to use gzip, and that the client supports gzip
         boolean acceptsGzip = Collections.list(httpRequest.getHeaders(ACCEPT_ENCODING)).stream().anyMatch(STRING_MATCH);
-        boolean wantGzip = httpResponse.getHeaders(CONTENT_ENCODING).contains(GZIP);
-
-        if (acceptsGzip && wantGzip) {
-            outputStream = new GZIPOutputStream(outputStream, true);
-        }
+//        boolean wantGzip = httpResponse.getHeaders(CONTENT_ENCODING).contains(GZIP);
+//
+//        if (acceptsGzip && wantGzip) {
+//            outputStream = new GZIPOutputStream(outputStream, true);
+//        }
 
         return outputStream;
     }
